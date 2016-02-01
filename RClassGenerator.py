@@ -363,12 +363,12 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
                 if inStyleable:
                     if stripedLine == '};':
                         inStyleable = False
-                    continue
-                if stripedLine.startswith('public static final class'):
-                    currentResType = stripedLine[26:-2].strip()
-                elif stripedLine == '}':
-                    currentResType = None
-                newRLines.append(tempLine)
+                else:
+                    if stripedLine.startswith('public static final class'):
+                        currentResType = stripedLine[26:-2].strip()
+                    elif stripedLine == '}' or stripedLine == '};':
+                        currentResType = None
+                    newRLines.append(tempLine)
             else:
                 if currentResType is not None:
                     splitLine = tempLine.split('=')
@@ -406,7 +406,7 @@ def writeToFile(filePath, fileContentList):
                 isInComment = False
         else:
             destRClassFp.write(fileLine)
-        
+
     destRClassFp.close()
     
 def replaceCodeImport(srcPathList, package, RPackageName):
