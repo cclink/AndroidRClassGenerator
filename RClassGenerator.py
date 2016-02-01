@@ -439,22 +439,22 @@ def process():
     sdkdir = configParser.get('Dir', 'sdkdir')
     # 没有相应配置，返回
     if not os.path.exists(sdkdir) or not os.path.exists(projectDir):
-        raise 'Invalid parameters'
+         raise RuntimeError('Invalid parameters')
     # 判断工程是Eclipse还是Android Studio
     isEclipse = isEclipseProject(projectDir)
     isAndroidStudio = isAndroidStudioProject(projectDir)
     # 既不是Eclipse，也不是Android Studio
     if not isEclipse and not isAndroidStudio:
-        raise 'Unknown project type'
+        raise RuntimeError('Unknown project type')
     
     # 获取android sdk中的aapt文件路径和android.jar文件路径
     aaptFile = getAaptFile(isEclipse, projectDir, sdkdir)
     androidjarFile = getAndroidjarFile(isEclipse, projectDir, sdkdir)
     # 获取不到文件，或者文件不存在，返回
     if aaptFile == None or not os.path.exists(aaptFile):
-        raise 'Cannot find aapt.exe in ' + sdkdir
+         raise RuntimeError('Cannot find aapt.exe in ' + sdkdir)
     if androidjarFile == None or not os.path.exists(androidjarFile):
-        raise 'Cannot find android.jar in ' + sdkdir
+         raise RuntimeError('Cannot find android.jar in ' + sdkdir)
     # 通过aapt生成R.java类路径，项目中res文件夹路径和AndroidManifest.xml文件路径
     RPath = getRPath(isEclipse, projectDir)
     resPath = getResPath(isEclipse, projectDir)
@@ -462,7 +462,7 @@ def process():
     if not os.path.exists(RPath):
         os.mkdir(RPath)
     if not os.path.exists(resPath) or not os.path.exists(manifestFile):
-        raise 'Cannot find resPath or manifest file in ' + projectDir
+         raise RuntimeError('Cannot find resPath or manifest file in ' + projectDir)
     # 判断工程是否是Library工程
     isLibrary = getIsLibraryProject(isEclipse, projectDir)
     command = aaptFile + ' p -m -J '+ RPath + ' -S ' + resPath + ' -M ' + manifestFile + ' -I ' + androidjarFile
