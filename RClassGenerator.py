@@ -349,29 +349,42 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
     newRLines.append(newl)
     
     start = False
+    inStyleable = False
     currentResType = None
     if isLibrary:
         resIDPrefix = 'public static int'
     else:
         resIDPrefix = 'public static final int'
+    styleableResIDPrefix = 'public static final int[]'
     for tempLine in rlines:
         if start:
             if tempLine.find('=') == -1:
                 stripedLine = tempLine.strip()
+                if inStyleable:
+                    if stripedLine == '};':
+                        inStyleable = False
+                    continue
                 if stripedLine.startswith('public static final class'):
                     currentResType = stripedLine[26:-2].strip()
                 elif stripedLine == '}':
                     currentResType = None
                 newRLines.append(tempLine)
             else:
-                splitLine = tempLine.split('=')
-                leftLine = splitLine[0]
-                resName = splitLine[0].strip()
-                if resName.startswith(resIDPrefix):
-                    resName = resName[len(resIDPrefix):].strip()
-                    if resName != '' and currentResType != None:
-                        newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
-                        newRLines.append(newLine + newl)
+                if currentResType is not None:
+                    splitLine = tempLine.split('=')
+                    leftLine = splitLine[0]
+                    resName = splitLine[0].strip()
+                    if resName.startswith(styleableResIDPrefix):
+                        resName = resName[len(styleableResIDPrefix):].strip()
+                        if resName != '':
+                            newLine = leftLine.rstrip() + ' = getStyleableId("' + resName + '");'
+                            newRLines.append(newLine + newl)
+                            inStyleable = True
+                    else:
+                        resName = resName[len(resIDPrefix):].strip()
+                        if resName != '':
+                            newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
+                            newRLines.append(newLine + newl)
         else:
             if tempLine.strip().startswith('public final class R {'):
                 start = True
