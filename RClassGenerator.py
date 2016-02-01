@@ -382,8 +382,11 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
                     else:
                         resName = resName[len(resIDPrefix):].strip()
                         if resName != '':
-                            newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
-                            newRLines.append(newLine + newl)
+                            if currentResType != 'styleable':
+                                newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
+                                newRLines.append(newLine + newl)
+                            else:
+                                newRLines.append(tempLine)
         else:
             if tempLine.strip().startswith('public final class R {'):
                 start = True
