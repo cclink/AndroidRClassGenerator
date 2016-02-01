@@ -313,8 +313,7 @@ public final class R {
         }
         return id;
     }
-    
-    @SuppressWarnings("unused")
+
     private static final int[] getStyleableId(String resName) {
         try {
             Field[] fields2 = Class.forName(mPackageName + ".R$styleable").getFields();
