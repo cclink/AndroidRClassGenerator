@@ -187,7 +187,7 @@ def getPackageName(isEclipse, projectDir):
 
 def getRClassFile(isEclipse, projectDir, RPath):
     packageName = getPackageName(isEclipse, projectDir)
-    if packageName != None and packageName != '':
+    if packageName is not None and packageName != '':
         splitPackageName = packageName.split('.')
         RClassFile = RPath
         for splitItem in splitPackageName:
@@ -314,7 +314,7 @@ public final class R {
         return null;
     }
 '''
-    
+
 def convertR(isLibrary, RClassFile, destRClassPackage):
     # 获取R类文件中的换行符号
     fp = open(RClassFile, 'rU') 
@@ -429,8 +429,8 @@ def replaceCodeImport(srcPathList, package, RPackageName):
     
 def process():
     configParser = getConfigParser()
-    if configParser == None:
-        return
+    if configParser is None:
+        raise RuntimeError('Get parser failed')
     # 获取配置文件中配置的工程目录和R类文件的包名称
     projectDir = configParser.get('Dir', 'ProjectDir')
     sdkdir = configParser.get('Dir', 'sdkdir')
@@ -448,9 +448,9 @@ def process():
     aaptFile = getAaptFile(isEclipse, projectDir, sdkdir)
     androidjarFile = getAndroidjarFile(isEclipse, projectDir, sdkdir)
     # 获取不到文件，或者文件不存在，返回
-    if aaptFile == None or not os.path.exists(aaptFile):
+    if aaptFile is None or not os.path.exists(aaptFile):
          raise RuntimeError('Cannot find aapt.exe in ' + sdkdir)
-    if androidjarFile == None or not os.path.exists(androidjarFile):
+    if androidjarFile is None or not os.path.exists(androidjarFile):
          raise RuntimeError('Cannot find android.jar in ' + sdkdir)
     # 通过aapt生成R.java类路径，项目中res文件夹路径和AndroidManifest.xml文件路径
     RPath = getRPath(isEclipse, projectDir)
@@ -465,13 +465,13 @@ def process():
     command = aaptFile + ' p -m -J '+ RPath + ' -S ' + resPath + ' -M ' + manifestFile + ' -I ' + androidjarFile
     # 对Library工程需要添加参数--non-constant-id，这样生成的R.java中的资源id就是public static int，否则是public static final int
     if isLibrary:
-        command = command + ' --non-constant-id'
+        command += ' --non-constant-id'
     print 'Try to execute command: ' + command
     os.system(command)
     # 获取生成的R.java文件路径
     RClassFile = getRClassFile(isEclipse, projectDir, RPath)
     if not os.path.exists(RClassFile):
-        return;
+        raise RuntimeError('R class is not generated')
     
     # 获取目标R类的路径
     if configParser.has_option('RClass', 'RClassPackage'):
