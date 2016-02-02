@@ -378,7 +378,8 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
                         if resName != '':
                             newLine = leftLine.rstrip() + ' = getStyleableId("' + resName + '");'
                             newRLines.append(newLine + newl)
-                            inStyleable = True
+                            if not tempLine.strip().endswith('};'):
+                                inStyleable = True
                     else:
                         resName = resName[len(resIDPrefix):].strip()
                         if resName != '':
