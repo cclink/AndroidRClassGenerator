@@ -279,12 +279,10 @@ import android.content.res.Resources;
 import android.util.Log;
 
 public final class R {
-    private static Resources mResources;
     private static String mPackageName;
-    
+
     public static void init(Context context) {
         if (context != null) {
-            mResources = context.getResources();
             mPackageName = context.getPackageName();
             try {
                 Class.forName(mPackageName + ".R");
@@ -293,35 +291,22 @@ public final class R {
             }
         }
     }
-    
-    public static void release() {
-        mResources = null;
-        mPackageName = null;
-    }
-    
-    private static final int getResId(String resName, String resType) {
-        int id = 0;
-        if (mResources != null && mPackageName != null) {
-            try {
-                id = mResources.getIdentifier(resName, resType, mPackageName);
-            } catch (Throwable t) {
-                Log.e("get id failed", "id " + resName + " could not be found");
-            }
+
+    private static int getResId(String resName, String resType) {
+        try {
+            Field field = Class.forName(mPackageName + ".R$" + resType).getField(resName);
+            return (int)field.get(null);
         }
-        if (id == 0) {
-            Log.e("get id failed", "id " + resName + " is 0");
+        catch (Throwable t) {
+            Log.e("get id failed", "id " + resName + " could not be found");
         }
-        return id;
+        return 0;
     }
 
-    private static final int[] getStyleableId(String resName) {
+    private static int[] getStyleableId(String resName) {
         try {
-            Field[] fields2 = Class.forName(mPackageName + ".R$styleable").getFields();
-            for (Field f : fields2) {
-                if (f.getName().equals(resName)) {
-                    return (int[])f.get(null);
-                }
-            }
+            Field field = Class.forName(mPackageName + ".R$styleable").getField(resName);
+            return (int[])field.get(null);
         }
         catch (Throwable t) {
             Log.e("get id failed", "Styleable id " + resName + " could not be found");
@@ -340,13 +325,9 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
     rlines = fp.readlines()
     fp.close()
     
-    # 修改R类内容
-    newRLines = []
-    newRLines.append('package ' + destRClassPackage + ";" + newl)
-    newRLines.append(newl)
-    newRLines.append(getExtraAddedStr())
-    newRLines.append(newl)
-    
+    # 修改R类package和import和新增的函数
+    newRLines = ['package ' + destRClassPackage + ";" + newl, newl, getExtraAddedStr(), newl]
+
     start = False
     inStyleable = False
     currentResType = None
