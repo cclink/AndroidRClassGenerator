@@ -275,7 +275,6 @@ def getExtraAddedStr():
 '''import java.lang.reflect.Field;
 
 import android.content.Context;
-import android.content.res.Resources;
 import android.util.Log;
 
 public final class R {
