@@ -15,6 +15,20 @@ def getConfigParser() :
         parser.read(configFile)
         return parser
 
+# 判断是否是资源目录
+def isResDir(projectOrResDir):
+    manifestFile = os.path.join(projectOrResDir, 'AndroidManifest.xml')
+    gradleFile = os.path.join(projectOrResDir, 'build.gradle')
+    resTypes = ('drawable', 'layout', 'anim', 'animator', 'values')
+    if not os.path.exists(manifestFile) and not os.path.exists(gradleFile):
+        (_, dirNames, fileNames) = os.walk(projectOrResDir).next()
+        if len(fileNames) == 0:
+            for folder in dirNames:
+                for resType in resTypes:
+                    if folder.startswith(resType):
+                        return True
+    return False
+
 # 判断是否是Eclipse的工程
 def isEclipseProject(projectDir):
     manifestFile = os.path.join(projectDir, 'AndroidManifest.xml')
@@ -28,6 +42,26 @@ def isAndroidStudioProject(projectDir):
         return False
     else:
         return os.path.exists(gradleFile)
+
+def getDefaultAaptFile(sdkdir):
+    toolsPath = os.path.join(sdkdir, 'build-tools')
+    if os.path.exists(toolsPath):
+        _, dirNames, _ = os.walk(toolsPath).next()
+        if len(dirNames) != 0:
+            verPath = os.path.join(toolsPath, dirNames[0])
+            aaptPath = os.path.join(verPath, 'aapt.exe')
+            print 'aapt is at ' + aaptPath
+            return aaptPath
+
+def getDefaultAndroidjarFile(sdkdir):
+    platformPath = os.path.join(sdkdir, 'platforms')
+    if os.path.exists(platformPath):
+        _, dirNames, _ = os.walk(platformPath).next()
+        if len(dirNames) != 0:
+            verPath = os.path.join(platformPath, dirNames[0])
+            androidjarPath = os.path.join(verPath, 'android.jar')
+            print 'android.jar is at ' + androidjarPath
+            return androidjarPath
 
 def getAaptFile(isEclipse, projectDir, sdkdir):
     # 对Eclipse工程，在工程目录的project.properties文件中配置有编译时使用的目标版本
@@ -431,18 +465,62 @@ def process():
     if configParser is None:
         raise RuntimeError('Get parser failed')
     # 获取配置文件中配置的工程目录和R类文件的包名称
-    projectDir = configParser.get('Dir', 'ProjectDir')
+    ProjectOrResDir = configParser.get('Dir', 'ProjectOrResDir')
     sdkdir = configParser.get('Dir', 'sdkdir')
     # 没有相应配置，返回
-    if not os.path.exists(sdkdir) or not os.path.exists(projectDir):
+    if not os.path.exists(sdkdir) or not os.path.exists(ProjectOrResDir):
          raise RuntimeError('Invalid parameters')
-    # 判断工程是Eclipse还是Android Studio
-    isEclipse = isEclipseProject(projectDir)
-    isAndroidStudio = isAndroidStudioProject(projectDir)
-    # 既不是Eclipse，也不是Android Studio
-    if not isEclipse and not isAndroidStudio:
-        raise RuntimeError('Unknown project type')
-    
+
+    # 获取目标R类的路径
+    destRClassPackage = configParser.get('RClass', 'RClassPackage').strip('.')
+    # 判断所给路径是工程路径还是资源文件夹路径
+    isRes = isResDir(ProjectOrResDir)
+    if isRes:
+        processResDir(ProjectOrResDir, sdkdir, destRClassPackage)
+    else:
+        # 判断工程是Eclipse还是Android Studio
+        isEclipse = isEclipseProject(ProjectOrResDir)
+        isAndroidStudio = isAndroidStudioProject(ProjectOrResDir)
+        # 既不是Eclipse，也不是Android Studio
+        if not isEclipse and not isAndroidStudio:
+            raise RuntimeError('Unknown project type')
+        # 判断是否要替换代码中的import R类
+        isReplaceCode = False
+        if configParser.has_option('RClass', 'ReplaceCode'):
+            isReplace = configParser.get('RClass', 'ReplaceCode')
+            if isReplace.lower() == 'true':
+                isReplaceCode = True
+        processProjectDir(isEclipse, ProjectOrResDir, sdkdir, destRClassPackage, isReplaceCode)
+
+def processResDir(resDir, sdkdir, destRClassPackage):
+    # 获取android sdk中的aapt文件路径和android.jar文件路径
+    aaptFile = getDefaultAaptFile(sdkdir)
+    androidjarFile = getDefaultAndroidjarFile(sdkdir)
+    # 获取不到文件，或者文件不存在，返回
+    if aaptFile is None or not os.path.exists(aaptFile):
+         raise RuntimeError('Cannot find aapt.exe in ' + sdkdir)
+    if androidjarFile is None or not os.path.exists(androidjarFile):
+         raise RuntimeError('Cannot find android.jar in ' + sdkdir)
+    # 通过aapt生成R.java类路径，项目中res文件夹路径和AndroidManifest.xml文件路径
+    RPath = os.path.dirname(resDir)
+    manifestFile = os.path.join(os.path.dirname(__file__), 'AndroidManifest.xml')
+
+    isLibrary = True
+    command = aaptFile + ' p -J '+ RPath + ' -S ' + resDir + ' -M ' + manifestFile + ' -I ' + androidjarFile
+    # 对Library工程需要添加参数--non-constant-id，这样生成的R.java中的资源id就是public static int，否则是public static final int
+    if isLibrary:
+        command += ' --non-constant-id'
+    print 'Try to execute command: ' + command
+    os.system(command)
+    # 获取生成的R.java文件路径
+    RClassFile = os.path.join(RPath, 'R.java')
+    if not os.path.exists(RClassFile):
+        raise RuntimeError('R class is not generated')
+
+    newRLines = convertR(isLibrary, RClassFile, destRClassPackage)
+    writeToFile(RPath, newRLines)
+
+def processProjectDir(isEclipse, projectDir, sdkdir, destRClassPackage, isReplaceCode):
     # 获取android sdk中的aapt文件路径和android.jar文件路径
     aaptFile = getAaptFile(isEclipse, projectDir, sdkdir)
     androidjarFile = getAndroidjarFile(isEclipse, projectDir, sdkdir)
@@ -471,27 +549,18 @@ def process():
     RClassFile = getRClassFile(isEclipse, projectDir, RPath)
     if not os.path.exists(RClassFile):
         raise RuntimeError('R class is not generated')
-    
-    # 获取目标R类的路径
-    if configParser.has_option('RClass', 'RClassPackage'):
-        destRClassPackage = configParser.get('RClass', 'RClassPackage').strip('.')
-    else:
-        destRClassPackage = getPackageName(isEclipse, projectDir)
-        
+
     newRLines = convertR(isLibrary, RClassFile, destRClassPackage)
-    
+
     destRClassPath = getDestRClassPath(isEclipse, projectDir, destRClassPackage)
     writeToFile(destRClassPath, newRLines)
-    
-    # 判断是否要替换代码中的import信息（ReplaceCode可以不存在）
-    if configParser.has_option('RClass', 'ReplaceCode'):
-        isReplace = configParser.get('RClass', 'ReplaceCode')
-        if isReplace.lower() == 'true':
-            package = getPackageName(isEclipse, projectDir)
-            if package == destRClassPackage:
-                print 'the package name is the same, and no need to replace'
-            srcPathList = getSrcPathList(isEclipse, projectDir)
-            replaceCodeImport(srcPathList, package, destRClassPackage)
+
+    if isReplaceCode:
+        package = getPackageName(isEclipse, projectDir)
+        if package == destRClassPackage:
+            print 'the package name is the same, and no need to replace'
+        srcPathList = getSrcPathList(isEclipse, projectDir)
+        replaceCodeImport(srcPathList, package, destRClassPackage)
 
 if  __name__ == '__main__':
     process()
