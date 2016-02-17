@@ -304,49 +304,73 @@ def getDestRClassPath(isEclipse, projectDir, destRClassPackage):
         print 'The new R.java is ' + destRClassPath
         return destRClassPath
     
-def getExtraAddedStr():
-    return \
-'''import java.lang.reflect.Field;
-
-import android.content.Context;
+def getExtraAddedStr(newLine):
+    extraStr = \
+'''import android.content.Context;
 import android.util.Log;
+
+import java.lang.ref.WeakReference;
+import java.lang.reflect.Field;
 
 public final class R {
     private static String mPackageName;
+    private static WeakReference<Context> mContextRef;
 
     public static void init(Context context) {
         if (context != null) {
             mPackageName = context.getPackageName();
+            // try to get R class in the package
             try {
                 Class.forName(mPackageName + ".R");
-            } catch (Exception e) {
-                Log.e("init error","No R class");
+                mContextRef = null;
+            }
+            // if R class is not exist, record the context by WeakReference
+            catch (ClassNotFoundException e) {
+                Log.i("Eplay init info","No R class");
+                mContextRef = new WeakReference<>(context);
             }
         }
     }
 
     private static int getResId(String resName, String resType) {
-        try {
-            Field field = Class.forName(mPackageName + ".R$" + resType).getField(resName);
-            return (int)field.get(null);
+        // the WeakReference is null indicates the R class exists. We can use reflection to get the resource id.
+        if (mContextRef == null) {
+            try {
+                Field field = Class.forName(mPackageName + ".R$" + resType).getField(resName);
+                return (int)field.get(null);
+            }
+            catch (Throwable t) {
+                Log.e("get id failed", "id " + resName + " could not be found");
+            }
         }
-        catch (Throwable t) {
-            Log.e("get id failed", "id " + resName + " could not be found");
+        // the WeakReference is not null indicates the R class does not exist. We should use getResources().getIdentifier() method to get resource id.
+        else {
+            Context context = mContextRef.get();
+            if (context != null) {
+                return context.getResources().getIdentifier(resName, resType, mPackageName);
+            }
         }
         return 0;
     }
 
     private static int[] getStyleableId(String resName) {
-        try {
-            Field field = Class.forName(mPackageName + ".R$styleable").getField(resName);
-            return (int[])field.get(null);
+        // the WeakReference is null indicates the R class exists. We can use reflection to get the resource id.
+        if (mContextRef == null) {
+            try {
+                Field field = Class.forName(mPackageName + ".R$styleable").getField(resName);
+                return (int[])field.get(null);
+            }
+            catch (Throwable t) {
+                Log.e("get id failed", "Styleable id " + resName + " could not be found");
+            }
         }
-        catch (Throwable t) {
-            Log.e("get id failed", "Styleable id " + resName + " could not be found");
-        }
+        // the WeakReference is not null indicates the R class does not exist. But there is no way to get the Styleable id.
         return null;
     }
 '''
+    if newLine != '\n':
+        extraStr = extraStr.replace('\n', newLine)
+    return extraStr
 
 def convertR(isLibrary, RClassFile, destRClassPackage):
     # 获取R类文件中的换行符号
@@ -359,7 +383,7 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
     fp.close()
     
     # 修改R类package和import和新增的函数
-    newRLines = ['package ' + destRClassPackage + ";" + newl, newl, getExtraAddedStr(), newl]
+    newRLines = ['package ' + destRClassPackage + ";" + newl, newl, getExtraAddedStr(newl), newl]
 
     start = False
     inStyleable = False
