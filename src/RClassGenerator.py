@@ -333,7 +333,8 @@ public final class R {
     }
 
     private static int getResId(String resName, String resType) {
-        // the WeakReference is null indicates the R class exists. We can use reflection to get the resource id.
+        // The WeakReference is null indicates the R class exists. We can use reflection to get the resource id.
+        // Using reflection to get the resource id is much faster than getResources().getIdentifier()
         if (mContextRef == null) {
             try {
                 Field field = Class.forName(mPackageName + ".R$" + resType).getField(resName);
@@ -343,7 +344,8 @@ public final class R {
                 Log.e("get id failed", "id " + resName + " could not be found");
             }
         }
-        // the WeakReference is not null indicates the R class does not exist. We should use getResources().getIdentifier() method to get resource id.
+        // The WeakReference is not null indicates the R class does not exist.
+        // We should use getResources().getIdentifier() method to get resource id.
         else {
             Context context = mContextRef.get();
             if (context != null) {
@@ -354,7 +356,7 @@ public final class R {
     }
 
     private static int[] getStyleableId(String resName) {
-        // the WeakReference is null indicates the R class exists. We can use reflection to get the resource id.
+        // The WeakReference is null indicates the R class exists. We can use reflection to get the styleable ids.
         if (mContextRef == null) {
             try {
                 Field field = Class.forName(mPackageName + ".R$styleable").getField(resName);
@@ -364,7 +366,8 @@ public final class R {
                 Log.e("get id failed", "Styleable id " + resName + " could not be found");
             }
         }
-        // the WeakReference is not null indicates the R class does not exist. But there is no way to get the Styleable id.
+        // The WeakReference is not null indicates the R class does not exist.
+        // There is no way to get the styleable ids.
         return null;
     }
 '''
