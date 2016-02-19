@@ -528,8 +528,9 @@ def processResDir(resDir, sdkdir, destRClassPackage):
          raise RuntimeError('Cannot find aapt.exe in ' + sdkdir)
     if androidjarFile is None or not os.path.exists(androidjarFile):
          raise RuntimeError('Cannot find android.jar in ' + sdkdir)
-    # 通过aapt生成R.java类路径，项目中res文件夹路径和AndroidManifest.xml文件路径
+    # 通过aapt生成R.java类路径(使用资源目录的同级目录)
     RPath = os.path.dirname(resDir)
+    # AndroidManifest.xml文件路径（使用AndroidRClassGenerator中自带的AndroidManifest.xml）
     manifestFile = os.path.join(os.path.dirname(__file__), 'AndroidManifest.xml')
 
     isLibrary = True
@@ -571,7 +572,10 @@ def processProjectDir(isEclipse, projectDir, sdkdir, destRClassPackage, isReplac
     if isLibrary:
         command += ' --non-constant-id'
     print 'Try to execute command: ' + command
-    os.system(command)
+    ret = os.system(command)
+    if ret != 0:
+        print 'Find errors in resource folder'
+        exit(1)
     # 获取生成的R.java文件路径
     RClassFile = getRClassFile(isEclipse, projectDir, RPath)
     if not os.path.exists(RClassFile):
