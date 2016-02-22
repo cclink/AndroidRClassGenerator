@@ -1,6 +1,17 @@
 # AndroidRClassGenerator
-Generator R.java class under specific package for android res folder
+AndroidRClassGenerator is used to generate R.java class under specific package for android res folder
 
+# Configurations
+Before running AndroidRClassGenerator, the configurations in config.ini should be set. The meaning of each parameter is described as follows.
+
+1. ProjectOrResDir: the path of the android library project(Could be an Eclipse project or an Android Studio project). Also you can specify an resource path in Android project.
+
+2. sdkdir: the path of Android SDK
+
+3. RClassPackage: the destination class name of the R class.
+
+4. ReplaceCode: using to indicates whether replace the import information in codes. If it is set as true, the replace code process will be execute after R class generated.
+If ProjectOrResDir is set as the resources path, this parameter will be ignored.
 
 ---------------------------------------------------------分割线---------------------------------------------------------
 # AndroidRClassGenerator
