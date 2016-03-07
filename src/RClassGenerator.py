@@ -354,22 +354,6 @@ public final class R {
         }
         return 0;
     }
-
-    private static int[] getStyleableId(String resName) {
-        // The WeakReference is null indicates the R class exists. We can use reflection to get the styleable ids.
-        if (mContextRef == null) {
-            try {
-                Field field = Class.forName(mPackageName + ".R$styleable").getField(resName);
-                return (int[])field.get(null);
-            }
-            catch (Throwable t) {
-                Log.e("get id failed", "Styleable id " + resName + " could not be found");
-            }
-        }
-        // The WeakReference is not null indicates the R class does not exist.
-        // There is no way to get the styleable ids.
-        return null;
-    }
 '''
     if newLine != '\n':
         extraStr = extraStr.replace('\n', newLine)
@@ -396,7 +380,8 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
     else:
         resIDPrefix = 'public static final int'
     styleableResIDPrefix = 'public static final int[]'
-    for tempLine in rlines:
+    for index in range(len(rlines)):
+        tempLine = rlines[index]
         if start:
             if tempLine.find('=') == -1:
                 stripedLine = tempLine.strip()
@@ -415,42 +400,90 @@ def convertR(isLibrary, RClassFile, destRClassPackage):
                     leftLine = splitLine[0]
                     resName = splitLine[0].strip()
                     if resName.startswith(styleableResIDPrefix):
-                        resName = resName[len(styleableResIDPrefix):].strip()
-                        if resName != '':
-                            newLine = leftLine.rstrip() + ' = getStyleableId("' + resName + '");'
-                            newRLines.append(newLine + newl)
-                            if not tempLine.strip().endswith('};'):
-                                inStyleable = True
+                        newLine = leftLine.rstrip()
+                        newRLines.append(newLine + newl)
+                        if not tempLine.strip().endswith('};'):
+                            inStyleable = True
                     else:
-                        resName = resName[len(resIDPrefix):].strip()
-                        if resName != '':
-                            if currentResType != 'styleable':
-                                newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
-                                newRLines.append(newLine + newl)
-                            else:
-                                newRLines.append(tempLine)
+                        if currentResType != 'styleable':
+                            resName = resName[len(resIDPrefix):].strip()
+                            newLine = leftLine.rstrip() + ' = getResId("' + resName + '", "' + currentResType + '");'
+                            newRLines.append(newLine + newl)
+                        else:
+                            newRLines.append(tempLine)
         else:
             if tempLine.strip().startswith('public final class R {'):
                 start = True
+    newRLines = processComment(newRLines)
+    processStyleable(newRLines, resIDPrefix, styleableResIDPrefix, newl)
     return newRLines
-    
+
+def processComment(RLines):
+    isInComment = False
+    newRLines = []
+    for fileLine in RLines:
+        if not isInComment:
+            if fileLine.lstrip().startswith('/**'):
+                isInComment = True
+            else:
+                newRLines.append(fileLine)
+        if isInComment:
+            if fileLine.rstrip().endswith('*/'):
+                isInComment = False
+    return newRLines
+
+def processStyleable(newRLines, resIDPrefix, styleableResIDPrefix, newl):
+    for index in range(len(newRLines)):
+        tempLine = newRLines[index]
+        splitLine = tempLine.split('=')
+        leftLine = splitLine[0]
+        resName = splitLine[0].strip()
+        if resName.startswith(styleableResIDPrefix):
+            resName = resName[len(styleableResIDPrefix):].strip()
+            styleableDict = {}
+            nextIndex = index
+            while True:
+                nextIndex += 1
+                nextLine = newRLines[nextIndex]
+                parsedLine = parseStyleableLine(nextLine, resName, resIDPrefix)
+                if parsedLine is None:
+                    break
+                styleableDict[parsedLine[0]] = parsedLine[1]
+            allStyleable = ""
+            for temp in range(len(styleableDict)):
+                allStyleable = allStyleable + "attr." + styleableDict[str(temp)]
+                if temp != len(styleableDict) - 1:
+                    allStyleable = allStyleable + ", "
+            newLine = leftLine.rstrip() + ' = { ' + allStyleable + ' };' + newl
+            newRLines[index] = newLine
+
+def parseStyleableLine(styleableLine, styleableName, resIDPrefix):
+    if styleableLine.find('=') == -1:
+        return
+    splitLine = styleableLine.split('=')
+    resName = splitLine[0].strip()
+    if not resName.startswith(resIDPrefix):
+        return
+    resName = resName[len(resIDPrefix):].strip()
+    if not resName.startswith(styleableName):
+        return
+    resName = resName[len(styleableName):]
+    if not resName.startswith('_'):
+        return
+    resName = resName[1:]
+    resValue = splitLine[1].strip()
+    if not resValue.endswith(';'):
+        return
+    resValue = resValue[:-1]
+    return (resValue, resName)
+
 def writeToFile(filePath, fileContentList):
     # 写入目标R类所在的目录
     if not os.path.exists(filePath):
         os.makedirs(filePath)
     destRClassFile = os.path.join(filePath, 'R.java')
     destRClassFp = codecs.open(destRClassFile, 'w', 'utf-8')
-    isInComment = False
-    for fileLine in fileContentList:
-        if not isInComment:
-            if fileLine.lstrip().startswith('/**'):
-                isInComment = True
-        if isInComment:
-            if fileLine.rstrip().endswith('*/'):
-                isInComment = False
-        else:
-            destRClassFp.write(fileLine)
-
+    destRClassFp.writelines(fileContentList)
     destRClassFp.close()
     
 def replaceCodeImport(srcPathList, package, RPackageName):
