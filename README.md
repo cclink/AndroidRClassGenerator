@@ -95,8 +95,3 @@ context.getResources().getIdentifier()是android sdk提供的一个api，通过�
 AndroidRClassGenerator生成的R类同时包含了这两种实现方式，它首先会尝试通过反射方式来获取系统资源id，如果反射方式获取失败，在尝试用context.getResources().getIdentifier()方式来获取。
 之所以先用反射方式来获取资源id，是因为反射方式可以获取到包括styleable在内的所有资源类型的id，此外，反射方式比context.getResources().getIdentifier()方式要快得多。但反射方式的缺点是必须要存在一个app包名下的R类。如果这个类不存在，则反射方式失效。
 无论有没有app包名下的R类，context.getResources().getIdentifier()都能够获取到除styleable资源之外的其他资源id，但context.getResources().getIdentifier()方式无法获取到styleable资源的id。
-
-## 可能的问题
-如前所示，context.getResources().getIdentifier()方式无法获取到styleable资源的id。所以，如果一个library中包含了styleable资源，而app编译时又没有生成一个app包名下的R类（Unity3D直接编译出的apk中就不包含R类），则仍然会出现ClassNotFound的异常。暂时没有办法解决这个问题。
-为此，对library开发者来说，如果要支持这种特殊使用方式，就应该不使用任何styleable资源，改用set*的方式来设置自定义控件的属性。
-对app开发者来说，只能再将app包下的R类也一起打进apk中。
