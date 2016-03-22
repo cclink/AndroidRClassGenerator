@@ -1,4 +1,4 @@
-# AndroidRClassGenerator
+﻿# AndroidRClassGenerator
 AndroidRClassGenerator is used to generate R.java class under specific package for android res folder
 
 # Configurations
@@ -87,11 +87,8 @@ library工程的AndroidManifest.xml文件中包含了包名称的配置，生成
 为了达到此目录，需要为该library工程生成一个library工程包名下的R类，然后将该R类编译打包到apk中。这样library工程中的代码在运行就不会找不到对应的R类了。AndroidRClassGenerator可以根据library工程中的res目录生成对应的R类。
 
 # 实现原理
-通过用AndroidRClassGenerator手动生成R类代替了原本应该在app编译时生成的R类，用这种方式来让library中代码能够正确的得到资源id。
-由于资源id只有在apk编译时才能最终确定，所以AndroidRClassGenerator生成的R类不能用某次编译时的常量来代替。只能另寻其他方式实现。
-有两种方式可以获取到资源id：一种是通过反射app包名下的R类来获取，一种是通过context.getResources().getIdentifier()方法来获取。
-通过反射方式来获取资源id的原理是，虽然app编译时不会为每个library生成单独的R类，但是仍然会生成一个app包名下的R类，这个R类中包含了所有library中的资源id（同时还包含了app自身的全部资源的id），通过反射这个R类，可以得到对应的资源id。
-context.getResources().getIdentifier()是android sdk提供的一个api，通过此接口可以获取到指定类型，指定名称的资源id。
-AndroidRClassGenerator生成的R类同时包含了这两种实现方式，它首先会尝试通过反射方式来获取系统资源id，如果反射方式获取失败，在尝试用context.getResources().getIdentifier()方式来获取。
-之所以先用反射方式来获取资源id，是因为反射方式可以获取到包括styleable在内的所有资源类型的id，此外，反射方式比context.getResources().getIdentifier()方式要快得多。但反射方式的缺点是必须要存在一个app包名下的R类。如果这个类不存在，则反射方式失效。
-无论有没有app包名下的R类，context.getResources().getIdentifier()都能够获取到除styleable资源之外的其他资源id，但context.getResources().getIdentifier()方式无法获取到styleable资源的id。
+通过用AndroidRClassGenerator生成R类代替了原本应该在app编译时生成的R类，用这种方式来让library中代码能够正确的得到资源id。由于资源id只有在apk编译时才能最终确定，所以AndroidRClassGenerator生成的R类不能用某次编译时的常量来代替。 
+有两种方式可以获取到资源id：一种是通过反射app包名下的R类来获取，一种是通过getResources().getIdentifier()方法来获取。 
+通过反射方式来获取资源id的原理是，虽然app编译时不会为每个library生成单独的R类，但是仍然会生成一个app包名下的R类，这个R类中包含了所有library中的资源id（当然也还包含app自身的全部资源的id），通过反射读取这个R类，可以得到对应的资源id。 getResources().getIdentifier()是android sdk提供的一个api，通过此接口可以获取到指定类型，指定名称的资源id。 
+AndroidRClassGenerator生成的R类同时包含了这两种实现方式，它首先会尝试通过反射方式来获取系统资源id，如果反射方式获取失败，再尝试用getResources().getIdentifier()方式来获取。 
+之所以先用反射方式来获取资源id，是因为反射方式比getResources().getIdentifier()方式要快得多。但反射方式的缺点是必须要存在一个app包名下的R类。如果这个类不存在（例如，通过Unity3D直接编译出的apk中就不包含R类），则反射方式失效。无论有没有app包名下的R类，context.getResources().getIdentifier()都能够获取到资源id，但context.getResources().getIdentifier()方式比反射方式要慢一些。
