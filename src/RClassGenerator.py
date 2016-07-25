@@ -6,6 +6,7 @@ import codecs
 import ConfigParser
 import xml.dom.minidom
 import re
+import sys
 
 # 获取配置文件解释器
 def getConfigParser() :
@@ -312,7 +313,7 @@ import android.util.Log;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 
-public final class R {
+public final class NewR {
     private static String mPackageName;
     private static WeakReference<Context> mContextRef;
 
@@ -481,7 +482,7 @@ def writeToFile(filePath, fileContentList):
     # 写入目标R类所在的目录
     if not os.path.exists(filePath):
         os.makedirs(filePath)
-    destRClassFile = os.path.join(filePath, 'R.java')
+    destRClassFile = os.path.join(filePath, 'NewR.java')
     destRClassFp = codecs.open(destRClassFile, 'w', 'utf-8')
     destRClassFp.writelines(fileContentList)
     destRClassFp.close()
@@ -521,18 +522,10 @@ def replaceCodeImport(srcPathList, package, RPackageName):
                     fp.close()
     
 def process():
-    configParser = getConfigParser()
-    if configParser is None:
-        raise RuntimeError('Get parser failed')
-    # 获取配置文件中配置的工程目录和R类文件的包名称
-    ProjectOrResDir = configParser.get('Dir', 'ProjectOrResDir')
-    sdkdir = configParser.get('Dir', 'sdkdir')
     # 没有相应配置，返回
     if not os.path.exists(sdkdir) or not os.path.exists(ProjectOrResDir):
          raise RuntimeError('Invalid parameters')
 
-    # 获取目标R类的路径
-    destRClassPackage = configParser.get('RClass', 'RClassPackage').strip('.')
     # 判断所给路径是工程路径还是资源文件夹路径
     isRes = isResDir(ProjectOrResDir)
     if isRes:
@@ -544,12 +537,6 @@ def process():
         # 既不是Eclipse，也不是Android Studio
         if not isEclipse and not isAndroidStudio:
             raise RuntimeError('Unknown project type')
-        # 判断是否要替换代码中的import R类
-        isReplaceCode = False
-        if configParser.has_option('RClass', 'ReplaceCode'):
-            isReplace = configParser.get('RClass', 'ReplaceCode')
-            if isReplace.lower() == 'true':
-                isReplaceCode = True
         processProjectDir(isEclipse, ProjectOrResDir, sdkdir, destRClassPackage, isReplaceCode)
 
 def processResDir(resDir, sdkdir, destRClassPackage):
@@ -627,4 +614,23 @@ def processProjectDir(isEclipse, projectDir, sdkdir, destRClassPackage, isReplac
         replaceCodeImport(srcPathList, package, destRClassPackage)
 
 if  __name__ == '__main__':
+    configParser = getConfigParser()
+    if configParser is None:
+        raise RuntimeError('Get parser failed')
+    # 获取配置文件中配置的工程目录和R类文件的包名称
+    if len(sys.argv) > 1:
+        ProjectOrResDir = sys.argv[1]
+    else:
+        ProjectOrResDir = configParser.get('Dir', 'ProjectOrResDir')
+    sdkdir = configParser.get('Dir', 'sdkdir')
+
+    # 获取目标R类的路径
+    destRClassPackage = configParser.get('RClass', 'RClassPackage').strip('.')
+    # 判断是否要替换代码中的import R类
+    isReplaceCode = False
+    if configParser.has_option('RClass', 'ReplaceCode'):
+        isReplace = configParser.get('RClass', 'ReplaceCode')
+        if isReplace.lower() == 'true':
+            isReplaceCode = True
+
     process()
